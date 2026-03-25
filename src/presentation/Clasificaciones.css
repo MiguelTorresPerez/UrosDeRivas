@@ -433,6 +433,15 @@
   padding: 0.5rem 1rem;
   border-radius: 4px;
   font-size: 0.85rem;
+  gap: 0.8rem;
+}
+
+.row-left {
+  justify-content: flex-end;
+}
+
+.row-right {
+  justify-content: flex-start;
 }
 
 .form-hist-row.row-win .fh-score {
@@ -445,11 +454,15 @@
   color: #ff4444;
 }
 
+.fh-icon {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
 .fh-score {
   font-weight: 800;
   padding: 0.3rem 0.6rem;
   border-radius: 4px;
-  margin-right: 1rem;
   white-space: nowrap;
 }
 
@@ -458,6 +471,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 180px;
 }
 
 /* Head to Head Table */
@@ -487,12 +501,36 @@
 
 .h2h-lname {
   flex: 1;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.8rem;
   text-align: right;
+  color: #ccc;
 }
 
 .h2h-vname {
   flex: 1;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 0.8rem;
   text-align: left;
+  color: #ccc;
+}
+
+.h2h-shield {
+  width: 25px;
+  height: 25px;
+  object-fit: contain;
+  background: white;
+  border-radius: 50%;
+  padding: 2px;
+}
+
+.winner-text {
+  color: var(--accent-gold);
+  font-weight: 800;
 }
 
 .h2h-score {

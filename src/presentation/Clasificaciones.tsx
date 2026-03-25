@@ -272,7 +272,8 @@ export function Clasificaciones() {
         const opponentName = isLocal ? (m.visitorTeamEditableName || m.visitorTeam?.club?.name || m.visitorTeamName) : (m.localTeamEditableName || m.localTeam?.club?.name || m.localTeamName);
         return { 
           win, 
-          scoreText: `${isLocal ? m.localScore : m.visitorScore} - ${isLocal ? m.visitorScore : m.localScore}`, 
+          isLocal,
+          scoreText: `${m.localScore} - ${m.visitorScore}`, 
           opponentName 
         };
       });
@@ -409,30 +410,30 @@ export function Clasificaciones() {
                             <span className="stat-num">{comparisonStats.visitor.gamesLost}</span>
                           </div>
 
-                           {/* Puntos A Favor */}
+                           {/* Puntos A Favor (Promedio por partido) */}
                            <div className="stat-row">
-                            <span className="stat-num">{Number(comparisonStats.local.pointsScored).toFixed(1)}</span>
+                            <span className="stat-num">{Number(comparisonStats.local.pointsScored / Math.max(comparisonStats.local.gamesPlayed, 1)).toFixed(1)}</span>
                             <div className="bar-wrapper left-bar">
-                              <div className="bar-fill pb-fill" style={{ width: `${Math.min((comparisonStats.local.pointsScored / 1000) * 100, 100)}%` }}></div>
+                              <div className="bar-fill pb-fill" style={{ width: `${Math.min(((comparisonStats.local.pointsScored / Math.max(comparisonStats.local.gamesPlayed, 1)) / 100) * 100, 100)}%` }}></div>
                             </div>
                             <span className="stat-type">A FAVOR</span>
                             <div className="bar-wrapper right-bar">
-                              <div className="bar-fill pb-fill" style={{ width: `${Math.min((comparisonStats.visitor.pointsScored / 1000) * 100, 100)}%` }}></div>
+                              <div className="bar-fill pb-fill" style={{ width: `${Math.min(((comparisonStats.visitor.pointsScored / Math.max(comparisonStats.visitor.gamesPlayed, 1)) / 100) * 100, 100)}%` }}></div>
                             </div>
-                            <span className="stat-num">{Number(comparisonStats.visitor.pointsScored).toFixed(1)}</span>
+                            <span className="stat-num">{Number(comparisonStats.visitor.pointsScored / Math.max(comparisonStats.visitor.gamesPlayed, 1)).toFixed(1)}</span>
                           </div>
                           
-                          {/* Puntos En Contra */}
+                          {/* Puntos En Contra (Promedio por partido) */}
                            <div className="stat-row">
-                            <span className="stat-num">{Number(comparisonStats.local.pointsReceived).toFixed(1)}</span>
+                            <span className="stat-num">{Number(comparisonStats.local.pointsReceived / Math.max(comparisonStats.local.gamesPlayed, 1)).toFixed(1)}</span>
                             <div className="bar-wrapper left-bar lose-bar">
-                              <div className="bar-fill" style={{ width: `${Math.min((comparisonStats.local.pointsReceived / 1000) * 100, 100)}%` }}></div>
+                              <div className="bar-fill" style={{ width: `${Math.min(((comparisonStats.local.pointsReceived / Math.max(comparisonStats.local.gamesPlayed, 1)) / 100) * 100, 100)}%` }}></div>
                             </div>
                             <span className="stat-type">EN CONTRA</span>
                             <div className="bar-wrapper right-bar lose-bar">
-                              <div className="bar-fill" style={{ width: `${Math.min((comparisonStats.visitor.pointsReceived / 1000) * 100, 100)}%` }}></div>
+                              <div className="bar-fill" style={{ width: `${Math.min(((comparisonStats.visitor.pointsReceived / Math.max(comparisonStats.visitor.gamesPlayed, 1)) / 100) * 100, 100)}%` }}></div>
                             </div>
-                            <span className="stat-num">{Number(comparisonStats.visitor.pointsReceived).toFixed(1)}</span>
+                            <span className="stat-num">{Number(comparisonStats.visitor.pointsReceived / Math.max(comparisonStats.visitor.gamesPlayed, 1)).toFixed(1)}</span>
                           </div>
                         </div>
                       ) : (
@@ -445,16 +446,18 @@ export function Clasificaciones() {
                         <div className="form-cols">
                           <div className="form-col-side left">
                             {getTeamFormMatches(gameDetail.localTeam?.id || gameDetail.localTeamId, matches).map((f, i) => (
-                              <div key={i} className={`form-hist-row ${f.win ? 'row-win' : 'row-lose'}`}>
-                                <span className="fh-score">{f.scoreText}</span>
+                              <div key={i} className={`form-hist-row row-left ${f.win ? 'row-win' : 'row-lose'}`}>
                                 <span className="fh-name" title={f.opponentName}>{f.opponentName}</span>
+                                <span className="fh-icon">{f.isLocal ? '🏠' : '✈️'}</span>
+                                <span className="fh-score">{f.scoreText}</span>
                               </div>
                             ))}
                           </div>
                           <div className="form-col-side right">
                              {getTeamFormMatches(gameDetail.visitorTeam?.id || gameDetail.visitorTeamId, matches).map((f, i) => (
-                              <div key={i} className={`form-hist-row ${f.win ? 'row-win' : 'row-lose'}`}>
+                              <div key={i} className={`form-hist-row row-right ${f.win ? 'row-win' : 'row-lose'}`}>
                                 <span className="fh-score">{f.scoreText}</span>
+                                <span className="fh-icon">{f.isLocal ? '🏠' : '✈️'}</span>
                                 <span className="fh-name" title={f.opponentName}>{f.opponentName}</span>
                               </div>
                             ))}
@@ -469,9 +472,22 @@ export function Clasificaciones() {
                           {getHeadToHead(gameDetail.localTeam?.id || gameDetail.localTeamId, gameDetail.visitorTeam?.id || gameDetail.visitorTeamId, matches).map((hm, i) => (
                              <div key={i} className="h2h-row">
                                <span className="h2h-date">{new Date(hm.date).toLocaleString('es-ES', { month: 'short', day: 'numeric'})}</span>
-                               <span className="h2h-lname">{hm.localTeamEditableName || hm.localTeamName}</span>
+                               
+                               <div className="h2h-lname">
+                                 <span className={hm.localScore > hm.visitorScore ? 'winner-text' : ''}>
+                                   {hm.localTeam?.club?.name || hm.localTeamEditableName || hm.localTeamName || 'Local'}
+                                 </span>
+                                 {(hm.localTeam?.shieldUrl || hm.localTeamShieldUrl) && <img src={hm.localTeam?.shieldUrl || hm.localTeamShieldUrl} alt="" className="h2h-shield"/>}
+                               </div>
+
                                <span className="h2h-score">{hm.localScore} - {hm.visitorScore}</span>
-                               <span className="h2h-vname">{hm.visitorTeamEditableName || hm.visitorTeamName}</span>
+
+                               <div className="h2h-vname">
+                                 {(hm.visitorTeam?.shieldUrl || hm.visitorTeamShieldUrl) && <img src={hm.visitorTeam?.shieldUrl || hm.visitorTeamShieldUrl} alt="" className="h2h-shield"/>}
+                                 <span className={hm.visitorScore > hm.localScore ? 'winner-text' : ''}>
+                                   {hm.visitorTeam?.club?.name || hm.visitorTeamEditableName || hm.visitorTeamName || 'Visitante'}
+                                 </span>
+                               </div>
                              </div>
                           ))}
                           {getHeadToHead(gameDetail.localTeam?.id || gameDetail.localTeamId, gameDetail.visitorTeam?.id || gameDetail.visitorTeamId, matches).length === 0 && (
