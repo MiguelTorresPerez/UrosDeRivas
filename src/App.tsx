@@ -17,7 +17,7 @@ function App() {
   }, [initAuth]);
 
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <div className="app-container" style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
         <Navbar />
         <main style={{ flex: 1 }}>
