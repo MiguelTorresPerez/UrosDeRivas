@@ -12,7 +12,7 @@ export function Navbar() {
     <nav className="navbar">
       <div className="nav-container">
         <Link to="/" className="nav-brand">
-          <img src="/assets/navbar_black_bull.png" alt="Uros de Rivas" className="nav-logo" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+          <img src={`${import.meta.env.BASE_URL}assets/navbar_black_bull.png`} alt="Uros de Rivas" className="nav-logo" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
           <span>UROS DE RIVAS</span>
         </Link>
         
