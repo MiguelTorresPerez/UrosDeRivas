@@ -1,8 +1,8 @@
-# 🏀 Plataforma Web Universal para Clubes de Baloncesto (Clupik Integration)
+# 🏀 Plataforma Web Universal para Clubes (Clupik Integration) - Uros de Rivas
 
 Una plataforma frontend de alto rendimiento y estética ultra-premium desarrollada originalmente para el **Club Deportivo Elemental Uros de Rivas**, diseñada desde cero bajo una concepción de Arquitectura Hexagonal y utilizando Vite + React + TypeScript.
 
-Este repositorio no solo contiene el ecosistema del club Uros de Rivas, sino que está preparado estructuralmente para servir como **Plantilla Universal (Boilerplate)** para cualquier otro club deportivo cuyas competiciones y calendarios estén federados y registrados a través del ecosistema de la **API de Clupik**.
+Este repositorio no solo contiene el ecosistema del club de baloncesto Uros de Rivas, sino que está preparado estructuralmente para servir como **Plantilla Universal (Boilerplate)** para cualquier otro club deportivo cuyas competiciones y calendarios estén federados y registrados a través del ecosistema de la **API de Clupik**.
 
 ## ✨ Características Principales
 
