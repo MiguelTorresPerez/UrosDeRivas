@@ -19,9 +19,7 @@ interface ClupikGame {
   competitionId?: string;
   groupId?: string;
   competition?: { id: string; name: string };
-  competitionName?: string;
   group?: { id: string; title: string; phaseId?: string, phase?: { id: string, title: string } };
-  groupName?: string;
   localTeam?: { id: string, shieldUrl: string, club?: { id: string, name: string } };
   visitorTeam?: { id: string, shieldUrl: string, club?: { id: string, name: string } };
 }
@@ -95,7 +93,7 @@ export function Clasificaciones() {
 
   // Standings State
   const [dynamicStandings, setDynamicStandings] = useState<StandingTeam[]>([]);
-  const [selectedCompKey, setSelectedCompKey] = useState<string>(''); // format: "compId_phaseId_groupId"
+  const [selectedCompKey, setSelectedCompKey] = useState<string>('ALL'); // format: "compId_phaseId_groupId" or "ALL"
   const [loadingStandings, setLoadingStandings] = useState(false);
 
   // Deep Stats State
@@ -166,9 +164,24 @@ export function Clasificaciones() {
     fetchGeneralData();
   }, [clubId]);
 
-  // Derived filters
-  const pastMatches = useMemo(() => matches.filter(m => m.status === 'finished' || new Date(m.date) < new Date()), [matches]);
-  const upcomingMatches = useMemo(() => matches.filter(m => m.status !== 'finished' && new Date(m.date) >= new Date()).reverse(), [matches]); // Soonest first
+  // Derived filters with global Competition Filter applied
+  const pastMatches = useMemo(() => {
+    let filtered = matches.filter(m => m.status === 'finished' || new Date(m.date) < new Date());
+    if (selectedCompKey && selectedCompKey !== 'ALL') {
+      const [compId, _phase, groupId] = selectedCompKey.split('_');
+      filtered = filtered.filter(m => m.competitionId === compId && m.groupId === groupId);
+    }
+    return filtered;
+  }, [matches, selectedCompKey]);
+
+  const upcomingMatches = useMemo(() => {
+    let filtered = matches.filter(m => m.status !== 'finished' && new Date(m.date) >= new Date()).reverse();
+    if (selectedCompKey && selectedCompKey !== 'ALL') {
+      const [compId, _phase, groupId] = selectedCompKey.split('_');
+      filtered = filtered.filter(m => m.competitionId === compId && m.groupId === groupId);
+    }
+    return filtered;
+  }, [matches, selectedCompKey]);
 
   // Unique Competitions for Standings Tab
   const getUniqueCompetitions = () => {
@@ -192,18 +205,21 @@ export function Clasificaciones() {
     return Array.from(comps.values());
   };
   const compOptions = getUniqueCompetitions();
-  const compSelectOptions = compOptions.map(c => ({ value: `${c.compId}_${c.phaseId}_${c.groupId}`, label: c.compName }));
+  const compSelectOptions = [
+    { value: 'ALL', label: '🔄 Todas las competiciones' },
+    ...compOptions.map(c => ({ value: `${c.compId}_${c.phaseId}_${c.groupId}`, label: c.compName }))
+  ];
 
   // Load standings when Competition is selected in tab
   useEffect(() => {
-    if (tab === 'clasificacion' && compOptions.length > 0 && !selectedCompKey) {
+    if (tab === 'clasificacion' && compOptions.length > 0 && (!selectedCompKey || selectedCompKey === 'ALL')) {
       setSelectedCompKey(`${compOptions[0].compId}_${compOptions[0].phaseId}_${compOptions[0].groupId}`);
     }
   }, [tab, compOptions, selectedCompKey]);
 
   useEffect(() => {
     const fetchStandings = async () => {
-      if (!selectedCompKey) return;
+      if (!selectedCompKey || selectedCompKey === 'ALL') return;
       setLoadingStandings(true);
       const [compId, phaseId, groupId] = selectedCompKey.split('_');
       try {
@@ -310,9 +326,6 @@ export function Clasificaciones() {
           
           const localClubId = m.localTeam?.club?.id;
           const visitorClubId = m.visitorTeam?.club?.id;
-          const cName = m.competition?.name || m.competitionName || 'Competición';
-          const gName = m.group?.title || m.groupName || '';
-          const fullCompName = gName ? `${cName} - ${gName}` : cName;
 
           return (
             <div key={gameIdToUse} className="match-wrapper">
@@ -351,7 +364,6 @@ export function Clasificaciones() {
                 <div className="match-status">
                   {m.status === 'finished' ? <span className="badge-played">Final</span> : <span className="badge-scheduled">Próximo</span>}
                 </div>
-                <div className="match-comp" title={fullCompName}>{fullCompName}</div>
               </div>
 
               {/* Deep Stats Section */}
@@ -361,20 +373,17 @@ export function Clasificaciones() {
                     <span className="loading-msg">Mapeando telemetría...</span>
                   ) : gameDetail ? (
                     <div className="comparison-view">
-                      {/* Cabecera de Competición y Fase/Grupo */}
-                      <div className="comp-info-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', textAlign: 'center', color: '#ccc', fontSize: '0.85rem' }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>Competición</div>
-                          <div style={{ fontWeight: 600, color: '#fff' }}>{gameDetail.competition?.name || gameDetail.competitionName || 'N/A'}</div>
+                      <div className="comp-header">
+                        <div className="comp-info">
+                          <span className="info-label">COMPETICIÓN</span>
+                          <span className="info-val">{gameDetail.competition?.name || 'N/D'}</span>
                         </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>Fase / Grupo</div>
-                          <div style={{ fontWeight: 600, color: '#fff' }}>
-                            {[
-                              (gameDetail.group as any)?.phase?.title,
-                              gameDetail.group?.title || gameDetail.groupName
-                            ].filter(Boolean).join(' • ') || 'Fase Única'}
-                          </div>
+                        <div className="comp-info">
+                          <span className="info-label">FASE / GRUPO</span>
+                          <span className="info-val">
+                            {gameDetail.group?.phase?.title ? `${gameDetail.group.phase.title} • ` : ''}
+                            {gameDetail.group?.title}
+                          </span>
                         </div>
                       </div>
 
@@ -529,12 +538,21 @@ export function Clasificaciones() {
             <button className={`tab-btn ${tab === 'clasificacion' ? 'active' : ''}`} onClick={() => setTab('clasificacion')}>Clasificación</button>
           </div>
           
-          {/* Enhanced Combobox UI for Club Selection */}
           <SearchableSelect 
             options={knownClubs.map(c => ({ value: c.id, label: c.name }))}
             value={clubId}
-            onChange={(val: string) => { setClubId(val); setSelectedGameId(null); }}
+            onChange={(val: string) => { setClubId(val); setSelectedCompKey('ALL'); setSelectedGameId(null); }}
             placeholder="Seleccionar Club..."
+          />
+        </div>
+
+        {/* Global Competition Filter for both views */}
+        <div className="stands-subcontrols animate-fade-in">
+          <SearchableSelect 
+            options={compSelectOptions}
+            value={selectedCompKey}
+            onChange={(val: string) => setSelectedCompKey(val)}
+            placeholder="🔍 Filtrar Competición..."
           />
         </div>
       </div>
@@ -547,21 +565,12 @@ export function Clasificaciones() {
             <>
               {upcomingMatches.length > 0 && renderGameList("Próximos Partidos", upcomingMatches)}
               {pastMatches.length > 0 && renderGameList("Últimos Resultados", pastMatches)}
-              {matches.length === 0 && <div className="no-items">Sin partidos en el radar de fechas limitadas.</div>}
+              {upcomingMatches.length === 0 && pastMatches.length === 0 && <div className="no-items">Sin partidos que mostrar para esta selección.</div>}
             </>
           )}
 
           {tab === 'clasificacion' && (
             <div className="standings-wrapper">
-              <div className="comp-selector-wrap">
-                <SearchableSelect 
-                  options={compSelectOptions}
-                  value={selectedCompKey}
-                  onChange={(val: string) => setSelectedCompKey(val)}
-                  placeholder="Elige grupo de clasificación..."
-                />
-              </div>
-
               {loadingStandings ? (
                 <div className="loading-msg">Calculando estadísticas de grupo...</div>
               ) : dynamicStandings.length > 0 ? (
