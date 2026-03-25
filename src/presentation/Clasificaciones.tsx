@@ -15,6 +15,14 @@ interface ClupikGame {
   visitorTeamShieldUrl: string;
 }
 
+interface GameDetail {
+  id: string;
+  competition?: { name: string };
+  group?: { title: string; phase?: { title: string } };
+  localTeam?: { club?: { name: string, twitterUrl?: string } };
+  visitorTeam?: { club?: { name: string, twitterUrl?: string } };
+}
+
 interface Standing {
   position: number;
   team: string;
@@ -31,8 +39,13 @@ export function Clasificaciones() {
   const [standings, setStandings] = useState<Standing[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Deep Dive State
+  const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
+  const [gameDetail, setGameDetail] = useState<GameDetail | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
   useEffect(() => {
-    const fetchRealData = async () => {
+    const fetchGeneralData = async () => {
       setLoading(true);
       try {
         const res = await fetch(`https://api.clupik.com/clubs/${clubId}/games/publications?limit=80&languageId=709&languageCode=ES`);
@@ -54,22 +67,44 @@ export function Clasificaciones() {
         
         setMatches(uniqueGames);
 
-        // Fallback mock standings since the publications API doesn't include standings.
+        // Standings Fallback
         setStandings([
           { position: 1, team: 'Uros de Rivas', played: 22, won: 18, lost: 4, points: 40 },
           { position: 2, team: 'Movistar Estudiantes', played: 22, won: 17, lost: 5, points: 39 },
           { position: 3, team: 'Baloncesto Aristos A', played: 22, won: 15, lost: 7, points: 37 }
         ]);
-        
       } catch (err) {
-        console.error("Failed to fetch Clupik Data:", err);
+        console.error("Failed to fetch general Clupik Data:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchRealData();
+    fetchGeneralData();
   }, [clubId]);
+
+  const handleGameClick = async (gameId: string) => {
+    if (selectedGameId === gameId) {
+      setSelectedGameId(null);
+      setGameDetail(null);
+      return;
+    }
+    
+    setSelectedGameId(gameId);
+    setLoadingDetail(true);
+    setGameDetail(null);
+
+    try {
+      const res = await fetch(`https://api.clupik.com/games/${gameId}?clubId=${clubId}&languageId=709&navtabs=true&expand=organization,competition,group,group.phase,localTeam,stadium,localTeam.club,visitorTeam,visitorTeam.club&overrideClubId=${clubId}`);
+      if (!res.ok) throw new Error("Failed to fetch game detail");
+      const json = await res.json();
+      setGameDetail(json);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
 
   return (
     <div className="stands-container">
@@ -85,49 +120,89 @@ export function Clasificaciones() {
           <select 
             className="club-selector" 
             value={clubId} 
-            onChange={(e) => setClubId(e.target.value)}
+            onChange={(e) => {
+              setClubId(e.target.value);
+              setSelectedGameId(null);
+            }}
           >
             <option value="67">Uros de Rivas (67)</option>
             <option value="15">Otro Club Ejemplo (15)</option>
-            {/* The user can add more Club IDs dynamically here */}
           </select>
         </div>
       </div>
 
       {loading ? (
-        <div className="loading-state">Obteniendo datos reales desde Clupik API...</div>
+        <div className="loading-state">Desplegando infraestructura de datos...</div>
       ) : (
         <div className="stands-content animate-slide-up">
           {tab === 'partidos' && (
             <div className="matches-list">
               {matches.length === 0 ? (
-                <div className="no-items">No se encontraron partidos para este club.</div>
+                <div className="no-items">El club no cuenta con partidos recientes registrados.</div>
               ) : (
                 matches.map(m => (
-                  <div key={m.gameId} className="match-card">
-                    <div className="match-date">
-                      {new Date(m.date).toLocaleString('es-ES', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                    
-                    <div className="match-teams">
-                      <div className="team local-team">
-                        <span className="team-name">{m.localTeamEditableName || m.localTeamName}</span>
-                        {m.localTeamShieldUrl && <img src={m.localTeamShieldUrl} alt="shield" className="team-shield" />}
-                        {m.status === 'finished' && <span className="team-score">{m.localScore}</span>}
+                  <div key={m.gameId} className="match-wrapper">
+                    <div 
+                      className={`match-card ${selectedGameId === m.gameId ? 'expanded' : ''}`}
+                      onClick={() => handleGameClick(m.gameId)}
+                    >
+                      <div className="match-date">
+                        {new Date(m.date).toLocaleString('es-ES', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </div>
                       
-                      <div className="match-vs">VS</div>
+                      <div className="match-teams">
+                        <div className="team local-team">
+                          <span className="team-name">{m.localTeamEditableName || m.localTeamName}</span>
+                          {m.localTeamShieldUrl && <img src={m.localTeamShieldUrl} alt="shield" className="team-shield" />}
+                          {m.status === 'finished' && <span className="team-score">{m.localScore}</span>}
+                        </div>
+                        
+                        <div className="match-vs">VS</div>
+                        
+                        <div className="team visitor-team">
+                          {m.status === 'finished' && <span className="team-score">{m.awayScore ?? m.visitorScore}</span>}
+                          {m.visitorTeamShieldUrl && <img src={m.visitorTeamShieldUrl} alt="shield" className="team-shield" />}
+                          <span className="team-name">{m.visitorTeamEditableName || m.visitorTeamName}</span>
+                        </div>
+                      </div>
                       
-                      <div className="team visitor-team">
-                        {m.status === 'finished' && <span className="team-score">{m.awayScore ?? m.visitorScore}</span>}
-                        {m.visitorTeamShieldUrl && <img src={m.visitorTeamShieldUrl} alt="shield" className="team-shield" />}
-                        <span className="team-name">{m.visitorTeamEditableName || m.visitorTeamName}</span>
+                      <div className="match-status">
+                        {m.status === 'finished' ? <span className="badge-played">Final</span> : <span className="badge-scheduled">Próximo</span>}
                       </div>
                     </div>
-                    
-                    <div className="match-status">
-                      {m.status === 'finished' ? <span className="badge-played">Final</span> : <span className="badge-scheduled">Próximo</span>}
-                    </div>
+
+                    {/* Detailed Dropdown / Browsing Section */}
+                    {selectedGameId === m.gameId && (
+                      <div className="match-deep-stats animate-slide-down">
+                        {loadingDetail ? (
+                          <span className="loading-msg">Analizando detalles del partido...</span>
+                        ) : gameDetail ? (
+                          <div className="deep-stats-grid">
+                            <div className="stat-block">
+                              <span className="stat-label">COMPETICIÓN</span>
+                              <span className="stat-value">{gameDetail.competition?.name || 'N/D'}</span>
+                            </div>
+                            <div className="stat-block">
+                              <span className="stat-label">FASE / GRUPO</span>
+                              <span className="stat-value">
+                                {gameDetail.group?.phase?.title ? `${gameDetail.group.phase.title} • ` : ''}
+                                {gameDetail.group?.title || 'N/D'}
+                              </span>
+                            </div>
+                            <div className="stat-block">
+                              <span className="stat-label">CLUB INVITADO</span>
+                              <span className="stat-value">{gameDetail.visitorTeam?.club?.name || 'N/D'}</span>
+                            </div>
+                            <div className="stat-block">
+                              <span className="stat-label">CLUB LOCAL</span>
+                              <span className="stat-value">{gameDetail.localTeam?.club?.name || 'N/D'}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="loading-msg">Información no disponible</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))
               )}
