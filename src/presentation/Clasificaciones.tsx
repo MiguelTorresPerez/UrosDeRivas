@@ -19,7 +19,9 @@ interface ClupikGame {
   competitionId?: string;
   groupId?: string;
   competition?: { id: string; name: string };
+  competitionName?: string;
   group?: { id: string; title: string; phaseId?: string, phase?: { id: string, title: string } };
+  groupName?: string;
   localTeam?: { id: string, shieldUrl: string, club?: { id: string, name: string } };
   visitorTeam?: { id: string, shieldUrl: string, club?: { id: string, name: string } };
 }
@@ -308,6 +310,9 @@ export function Clasificaciones() {
           
           const localClubId = m.localTeam?.club?.id;
           const visitorClubId = m.visitorTeam?.club?.id;
+          const cName = m.competition?.name || m.competitionName || 'Competición';
+          const gName = m.group?.title || m.groupName || '';
+          const fullCompName = gName ? `${cName} - ${gName}` : cName;
 
           return (
             <div key={gameIdToUse} className="match-wrapper">
@@ -346,6 +351,7 @@ export function Clasificaciones() {
                 <div className="match-status">
                   {m.status === 'finished' ? <span className="badge-played">Final</span> : <span className="badge-scheduled">Próximo</span>}
                 </div>
+                <div className="match-comp" title={fullCompName}>{fullCompName}</div>
               </div>
 
               {/* Deep Stats Section */}
@@ -355,17 +361,20 @@ export function Clasificaciones() {
                     <span className="loading-msg">Mapeando telemetría...</span>
                   ) : gameDetail ? (
                     <div className="comparison-view">
-                      <div className="comp-header">
-                        <div className="comp-info">
-                          <span className="info-label">COMPETICIÓN</span>
-                          <span className="info-val">{gameDetail.competition?.name || 'N/D'}</span>
+                      {/* Cabecera de Competición y Fase/Grupo */}
+                      <div className="comp-info-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', textAlign: 'center', color: '#ccc', fontSize: '0.85rem' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>Competición</div>
+                          <div style={{ fontWeight: 600, color: '#fff' }}>{gameDetail.competition?.name || gameDetail.competitionName || 'N/A'}</div>
                         </div>
-                        <div className="comp-info">
-                          <span className="info-label">FASE / GRUPO</span>
-                          <span className="info-val">
-                            {gameDetail.group?.phase?.title ? `${gameDetail.group.phase.title} • ` : ''}
-                            {gameDetail.group?.title}
-                          </span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>Fase / Grupo</div>
+                          <div style={{ fontWeight: 600, color: '#fff' }}>
+                            {[
+                              (gameDetail.group as any)?.phase?.title,
+                              gameDetail.group?.title || gameDetail.groupName
+                            ].filter(Boolean).join(' • ') || 'Fase Única'}
+                          </div>
                         </div>
                       </div>
 
