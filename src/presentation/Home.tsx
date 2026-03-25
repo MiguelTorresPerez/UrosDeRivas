@@ -20,17 +20,17 @@ export function Home() {
         <h2>ÚLTIMAS NOTICIAS</h2>
         <div className="feature-grid">
           <div className="feature-card animate-slide-up">
-            <div className="feature-img" style={{ backgroundImage: "url('https://via.placeholder.com/600x400')" }}></div>
+            <div className="feature-img" style={{ backgroundImage: "url('/assets/bull_black.jpeg')" }}></div>
             <h3>Crónica del último partido EBA</h3>
             <p>El primer equipo consigue una victoria aplastante frente al Estudiantes.</p>
           </div>
           <div className="feature-card animate-slide-up" style={{ animationDelay: '0.1s' }}>
-            <div className="feature-img" style={{ backgroundImage: "url('https://via.placeholder.com/600x400/111111')" }}></div>
+            <div className="feature-img" style={{ backgroundImage: "url('/assets/bull_white.jpeg')" }}></div>
             <h3>Nuevas Equipaciones Disponibles</h3>
             <p>Hazte con la ropa oficial y luce los colores 2026/2027.</p>
           </div>
           <div className="feature-card animate-slide-up" style={{ animationDelay: '0.2s' }}>
-            <div className="feature-img" style={{ backgroundImage: "url('https://via.placeholder.com/600x400/222222')" }}></div>
+            <div className="feature-img" style={{ backgroundImage: "url('/assets/bull_black.jpeg')" }}></div>
             <h3>Inscripciones Abiertas</h3>
             <p>Reserva la plaza para las escuelas municipales y nuestro Campus de Verano.</p>
           </div>
@@ -40,11 +40,11 @@ export function Home() {
       <section className="sponsors-section">
         <h3>NUESTROS PATROCINADORES</h3>
         <div className="sponsors-scroll">
-          <span>Jarmauto</span>
-          <span>Rotusil</span>
-          <span>Everest Clínica Dental</span>
-          <span>Ferrual</span>
-          <span>Becsa</span>
+          <img src="/assets/sponsor_jarmauto.jpg" alt="Jarmauto" onError={e => e.currentTarget.style.display='none'} />
+          <img src="/assets/sponsor_rotusil.jpg" alt="Rotusil" onError={e => e.currentTarget.style.display='none'} />
+          <img src="/assets/sponsor_clinica_everest.jpg" alt="Everest Clínica Dental" onError={e => e.currentTarget.style.display='none'} />
+          <img src="/assets/sponsor_ferrual.jpg" alt="Ferrual" onError={e => e.currentTarget.style.display='none'} />
+          <img src="/assets/sponsor_alquiler_de_maquinaria.jpg" alt="Alquiler Maquinaria" onError={e => e.currentTarget.style.display='none'} />
         </div>
       </section>
     </div>

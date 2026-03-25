@@ -12,7 +12,7 @@ export function Navbar() {
     <nav className="navbar">
       <div className="nav-container">
         <Link to="/" className="nav-brand">
-          <img src="https://www.urosderivas.com/logo.png" alt="Uros de Rivas" className="nav-logo" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+          <img src="/assets/navbar_black_bull.png" alt="Uros de Rivas" className="nav-logo" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
           <span>UROS DE RIVAS</span>
         </Link>
         
@@ -20,6 +20,7 @@ export function Navbar() {
           <Link to="/" onClick={() => setIsOpen(false)}>INICIO</Link>
           <Link to="/events" onClick={() => setIsOpen(false)}>EVENTOS</Link>
           <Link to="/market" onClick={() => setIsOpen(false)}>TIENDA</Link>
+          <Link to="/clasificaciones" onClick={() => setIsOpen(false)}>CLASIFICACIONES</Link>
           
           {user ? (
             <div className="auth-box">
