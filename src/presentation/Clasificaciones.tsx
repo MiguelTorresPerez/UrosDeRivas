@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react';
 import './Clasificaciones.css';
 
-interface Match {
-  id: string;
+interface ClupikGame {
+  gameId: string;
+  localTeamName: string;
+  localTeamEditableName: string;
+  visitorTeamName: string;
+  visitorTeamEditableName: string;
+  localScore: number;
+  visitorScore: number;
+  status: string;
   date: string;
-  homeTeam: string;
-  awayTeam: string;
-  homeScore?: number;
-  awayScore?: number;
-  status: 'played' | 'scheduled';
+  localTeamShieldUrl: string;
+  visitorTeamShieldUrl: string;
 }
 
 interface Standing {
@@ -22,78 +26,111 @@ interface Standing {
 
 export function Clasificaciones() {
   const [tab, setTab] = useState<'partidos' | 'clasificacion'>('partidos');
-  const [matches, setMatches] = useState<Match[]>([]);
+  const [clubId, setClubId] = useState<string>('67'); // 67 = Uros de Rivas
+  const [matches, setMatches] = useState<ClupikGame[]>([]);
   const [standings, setStandings] = useState<Standing[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Attempt to fetch from Clupik API, fallback to mock data if it fails or returns 404
-    const fetchData = async () => {
+    const fetchRealData = async () => {
+      setLoading(true);
       try {
-        setLoading(true);
-        // User requested improvement on feed from https://api.clupik.com/team/1692954
-        // In a real scenario with correct endpoints/cors, this would execute:
-        // const res = await fetch('https://api.clupik.com/v1/team/1692954/games');
-        // const data = await res.json();
-        throw new Error("Simulating API fetch failure due to generic Clupik endpoint path");
-      } catch (e) {
-        // Fallback to beautiful mock data to demonstrate the UI
-        setTimeout(() => {
-          setMatches([
-            { id: '1', date: '2026-03-22T19:00:00Z', homeTeam: 'Uros de Rivas', awayTeam: 'Baloncesto Aristos A', homeScore: 85, awayScore: 78, status: 'played' },
-            { id: '2', date: '2026-03-25T20:00:00Z', homeTeam: 'CB Getafe', awayTeam: 'Uros de Rivas', homeScore: 60, awayScore: 62, status: 'played' },
-            { id: '3', date: '2026-03-29T18:30:00Z', homeTeam: 'Uros de Rivas', awayTeam: 'Movistar Estudiantes', status: 'scheduled' },
-            { id: '4', date: '2026-04-05T12:00:00Z', homeTeam: 'Zentro Basket Madrid', awayTeam: 'Uros de Rivas', status: 'scheduled' }
-          ]);
-          setStandings([
-            { position: 1, team: 'Uros de Rivas', played: 22, won: 18, lost: 4, points: 40 },
-            { position: 2, team: 'Movistar Estudiantes', played: 22, won: 17, lost: 5, points: 39 },
-            { position: 3, team: 'Baloncesto Aristos A', played: 22, won: 15, lost: 7, points: 37 },
-            { position: 4, team: 'Zentro Basket Madrid', played: 22, won: 14, lost: 8, points: 36 },
-            { position: 5, team: 'CB Getafe', played: 22, won: 12, lost: 10, points: 34 },
-          ]);
-          setLoading(false);
-        }, 800);
+        const res = await fetch(`https://api.clupik.com/clubs/${clubId}/games/publications?limit=80&languageId=709&languageCode=ES`);
+        if (!res.ok) throw new Error("Network response was not ok");
+        const json = await res.json();
+        
+        let allGames: ClupikGame[] = [];
+        json.forEach((pub: any) => {
+          if (pub.card && pub.card.games && Array.isArray(pub.card.games)) {
+            allGames = [...allGames, ...pub.card.games];
+          }
+        });
+
+        // Deduplicate games by gameId
+        const uniqueGames = Array.from(new Map(allGames.map(item => [item.gameId, item])).values());
+        
+        // Sort by date descending
+        uniqueGames.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        setMatches(uniqueGames);
+
+        // Fallback mock standings since the publications API doesn't include standings.
+        setStandings([
+          { position: 1, team: 'Uros de Rivas', played: 22, won: 18, lost: 4, points: 40 },
+          { position: 2, team: 'Movistar Estudiantes', played: 22, won: 17, lost: 5, points: 39 },
+          { position: 3, team: 'Baloncesto Aristos A', played: 22, won: 15, lost: 7, points: 37 }
+        ]);
+        
+      } catch (err) {
+        console.error("Failed to fetch Clupik Data:", err);
+      } finally {
+        setLoading(false);
       }
     };
-    fetchData();
-  }, []);
+
+    fetchRealData();
+  }, [clubId]);
 
   return (
     <div className="stands-container">
       <div className="stands-header">
-        <h1>Competición</h1>
-        <div className="stands-tabs">
-          <button className={`tab-btn ${tab === 'partidos' ? 'active' : ''}`} onClick={() => setTab('partidos')}>Partidos</button>
-          <button className={`tab-btn ${tab === 'clasificacion' ? 'active' : ''}`} onClick={() => setTab('clasificacion')}>Clasificación</button>
+        <h1>Competición en Vivo</h1>
+        
+        <div className="stands-controls">
+          <div className="stands-tabs">
+            <button className={`tab-btn ${tab === 'partidos' ? 'active' : ''}`} onClick={() => setTab('partidos')}>Partidos</button>
+            <button className={`tab-btn ${tab === 'clasificacion' ? 'active' : ''}`} onClick={() => setTab('clasificacion')}>Clasificación</button>
+          </div>
+          
+          <select 
+            className="club-selector" 
+            value={clubId} 
+            onChange={(e) => setClubId(e.target.value)}
+          >
+            <option value="67">Uros de Rivas (67)</option>
+            <option value="15">Otro Club Ejemplo (15)</option>
+            {/* The user can add more Club IDs dynamically here */}
+          </select>
         </div>
       </div>
 
       {loading ? (
-        <div className="loading-state">Sincronizando con Clupik API...</div>
+        <div className="loading-state">Obteniendo datos reales desde Clupik API...</div>
       ) : (
         <div className="stands-content animate-slide-up">
           {tab === 'partidos' && (
             <div className="matches-list">
-              {matches.map(m => (
-                <div key={m.id} className="match-card">
-                  <div className="match-date">{new Date(m.date).toLocaleString('es-ES', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
-                  <div className="match-teams">
-                    <div className={`team ${m.homeTeam === 'Uros de Rivas' ? 'highlight' : ''}`}>
-                      <span className="team-name">{m.homeTeam}</span>
-                      {m.status === 'played' && <span className="team-score">{m.homeScore}</span>}
+              {matches.length === 0 ? (
+                <div className="no-items">No se encontraron partidos para este club.</div>
+              ) : (
+                matches.map(m => (
+                  <div key={m.gameId} className="match-card">
+                    <div className="match-date">
+                      {new Date(m.date).toLocaleString('es-ES', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </div>
-                    <div className="match-vs">VS</div>
-                    <div className={`team ${m.awayTeam === 'Uros de Rivas' ? 'highlight' : ''}`}>
-                      {m.status === 'played' && <span className="team-score">{m.awayScore}</span>}
-                      <span className="team-name">{m.awayTeam}</span>
+                    
+                    <div className="match-teams">
+                      <div className="team local-team">
+                        <span className="team-name">{m.localTeamEditableName || m.localTeamName}</span>
+                        {m.localTeamShieldUrl && <img src={m.localTeamShieldUrl} alt="shield" className="team-shield" />}
+                        {m.status === 'finished' && <span className="team-score">{m.localScore}</span>}
+                      </div>
+                      
+                      <div className="match-vs">VS</div>
+                      
+                      <div className="team visitor-team">
+                        {m.status === 'finished' && <span className="team-score">{m.awayScore ?? m.visitorScore}</span>}
+                        {m.visitorTeamShieldUrl && <img src={m.visitorTeamShieldUrl} alt="shield" className="team-shield" />}
+                        <span className="team-name">{m.visitorTeamEditableName || m.visitorTeamName}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="match-status">
+                      {m.status === 'finished' ? <span className="badge-played">Final</span> : <span className="badge-scheduled">Próximo</span>}
                     </div>
                   </div>
-                  <div className="match-status">
-                    {m.status === 'played' ? <span className="badge-played">Final</span> : <span className="badge-scheduled">Próximamente</span>}
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           )}
 

@@ -1,6 +1,6 @@
 .stands-container {
   padding: 2rem 0;
-  max-width: 1000px;
+  max-width: 1100px;
   margin: 0 auto;
 }
 
@@ -16,6 +16,15 @@
   font-size: 2.5rem;
   color: var(--accent-gold);
   text-transform: uppercase;
+  text-align: center;
+}
+
+.stands-controls {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .stands-tabs {
@@ -48,6 +57,17 @@
   color: #fff;
 }
 
+.club-selector {
+  padding: 0.75rem 1rem;
+  background-color: #111;
+  color: #fff;
+  border: 1px solid #333;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .matches-list {
   display: flex;
   flex-direction: column;
@@ -61,7 +81,7 @@
   background-color: var(--secondary-bg);
   padding: 1.5rem;
   border-radius: 8px;
-  border-left: 4px solid var(--accent-gold);
+  border-left: 4px solid var(--accent-turquoise);
   transition: transform 0.2s;
 }
 
@@ -74,7 +94,7 @@
   color: var(--text-secondary);
   font-size: 0.9rem;
   text-transform: uppercase;
-  width: 150px;
+  width: 120px;
 }
 
 .match-teams {
@@ -82,34 +102,46 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 2rem;
+  gap: 1.5rem;
 }
 
 .team {
   display: flex;
   align-items: center;
   gap: 1rem;
-  width: 200px;
+  width: 250px;
 }
 
-.team:first-child {
+.local-team {
   justify-content: flex-end;
   text-align: right;
 }
 
-.team-name {
-  font-weight: 600;
-  font-size: 1.1rem;
+.visitor-team {
+  justify-content: flex-start;
+  text-align: left;
 }
 
-.highlight .team-name {
-  color: var(--accent-gold);
+.team-name {
+  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.team-shield {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 50%;
+  padding: 2px;
 }
 
 .team-score {
   font-size: 1.5rem;
   font-weight: 900;
   background: #000;
+  color: var(--accent-gold);
   padding: 0.2rem 0.8rem;
   border-radius: 4px;
 }
@@ -180,29 +212,33 @@
 }
 
 .row-highlight {
-  background-color: rgba(212, 175, 55, 0.1);
+  background-color: rgba(64, 224, 208, 0.1);
 }
 
 .row-highlight td {
-  color: var(--accent-gold);
+  color: var(--accent-turquoise);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .match-card {
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.5rem;
   }
   .match-teams {
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 1rem;
   }
-  .team, .team:first-child {
+  .team, .local-team, .visitor-team {
     width: 100%;
     justify-content: center;
     text-align: center;
+    flex-direction: row;
   }
   .match-date, .match-status {
     width: 100%;
     text-align: center;
+  }
+  .match-vs {
+    display: none;
   }
 }
