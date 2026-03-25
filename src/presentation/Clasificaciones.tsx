@@ -120,6 +120,22 @@ export function Clasificaciones() {
         // Ensure array of games from json.games (fixed structure)
         const gamesList: ClupikGame[] = Array.isArray(json) ? json : (json.games || json.data || []);
         
+        // Fallback: If external club returns 0 matches (no native Clupik presence),
+        // we revert to the Uros master feed and filter locally for games involving them.
+        if (gamesList.length === 0 && clubId !== '67') {
+          try {
+            const fbRes = await fetch(`https://api.clupik.com/games?clubId=67&from=${fromDate.toISOString()}&to=${toDate.toISOString()}&firstLoad=false&overrideClubId=67&expand=localTeam,localTeam.club,visitorTeam,visitorTeam.club,organization,competition,group,stadium`);
+            if (fbRes.ok) {
+              const fbJson = await fbRes.json();
+              const fbGames: ClupikGame[] = Array.isArray(fbJson) ? fbJson : (fbJson.games || fbJson.data || []);
+              const filteredMatches = fbGames.filter(m => m.localTeam?.club?.id === clubId || m.visitorTeam?.club?.id === clubId);
+              gamesList.push(...filteredMatches);
+            }
+          } catch(err) {
+            console.error("Fallback fetch failed", err);
+          }
+        }
+
         // Sorting by date descending (newest first)
         gamesList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setMatches(gamesList);
@@ -201,8 +217,8 @@ export function Clasificaciones() {
     fetchStandings();
   }, [selectedCompKey]);
 
-  // Deep match click handler (Master-Detail)
-  const handleGameClick = async (gameId: string) => {
+  const handleGameClick = async (clickedMatch: ClupikGame) => {
+    const gameId = clickedMatch.id || clickedMatch.gameId || '';
     if (selectedGameId === gameId) {
       setSelectedGameId(null);
       setGameDetail(null);
@@ -212,29 +228,22 @@ export function Clasificaciones() {
     
     setSelectedGameId(gameId);
     setLoadingDetail(true);
-    setGameDetail(null);
+    setGameDetail(clickedMatch); // Instantly set the cached matching object
     setComparisonStats(null);
 
     try {
-      // Fetch details using base game ID expansion
-      const dp = await fetch(`https://api.clupik.com/games/${gameId}?clubId=${clubId}&navtabs=true&expand=organization,competition,group,group.phase,localTeam,stadium,localTeam.club,visitorTeam,visitorTeam.club&overrideClubId=${clubId}`);
-      if (!dp.ok) throw new Error("Stats request failed");
-      const gameData: ClupikGame = await dp.json();
-      setGameDetail(gameData);
-
-      // Fetch standings for comparative stats
-      if (gameData.competitionId && gameData.group && gameData.groupId) {
-        // Robust phase resolution for the newly diagnosed structure
-        const targetPhaseId = (gameData.group as any).phaseId || gameData.group.phase?.id || '0';
+      // Fetch standings for comparative stats using cached match object
+      if (clickedMatch.competitionId && clickedMatch.group && clickedMatch.groupId) {
+        const targetPhaseId = (clickedMatch.group as any).phaseId || clickedMatch.group.phase?.id || '0';
         
         try {
-          const stRes = await fetch(`https://api.clupik.com/competitions/${gameData.competitionId}/phases/${targetPhaseId}/groups/${gameData.groupId}/standings?expand=team,team.club`);
+          const stRes = await fetch(`https://api.clupik.com/competitions/${clickedMatch.competitionId}/phases/${targetPhaseId}/groups/${clickedMatch.groupId}/standings?expand=team,team.club`);
           if (stRes.ok) {
             const stJson = await stRes.json();
             const standings = stJson.standings as StandingTeam[] || [];
             
-            const localTeamStats = standings.find(s => s.team.id === gameData.localTeamId || s.team.name === gameData.localTeamName) || null;
-            const visitorTeamStats = standings.find(s => s.team.id === gameData.visitorTeamId || s.team.name === gameData.visitorTeamName) || null;
+            const localTeamStats = standings.find(s => s.team.id === clickedMatch.localTeam?.id || s.team.name === clickedMatch.localTeamName || s.team.id === clickedMatch.localTeamId) || null;
+            const visitorTeamStats = standings.find(s => s.team.id === clickedMatch.visitorTeam?.id || s.team.name === clickedMatch.visitorTeamName || s.team.id === clickedMatch.visitorTeamId) || null;
             
             setComparisonStats({ local: localTeamStats, visitor: visitorTeamStats });
           }
@@ -243,13 +252,14 @@ export function Clasificaciones() {
         }
       }
     } catch (err) {
-      console.error(err);
+      console.error("Error drawing metrics", err);
     } finally {
       setLoadingDetail(false);
     }
   };
 
-  const getTeamForm = (teamId: string | undefined, mainMatches: ClupikGame[]) => {
+  // Re-engineered getTeamForm to return full match text history
+  const getTeamFormMatches = (teamId: string | undefined, mainMatches: ClupikGame[]) => {
     if (!teamId) return [];
     return mainMatches
       .filter(m => m.status === 'finished' && (m.localTeamId === teamId || m.visitorTeamId === teamId || m.localTeam?.id === teamId || m.visitorTeam?.id === teamId))
@@ -258,9 +268,22 @@ export function Clasificaciones() {
         const isLocal = m.localTeam?.id === teamId || m.localTeamId === teamId;
         const scored = isLocal ? m.localScore : m.visitorScore;
         const received = isLocal ? m.visitorScore : m.localScore;
-        const win = scored >= received; // including draws as positive or just handled as W
-        return { win, match: m };
+        const win = scored >= received;
+        const opponentName = isLocal ? (m.visitorTeamEditableName || m.visitorTeam?.club?.name || m.visitorTeamName) : (m.localTeamEditableName || m.localTeam?.club?.name || m.localTeamName);
+        return { 
+          win, 
+          scoreText: `${isLocal ? m.localScore : m.visitorScore} - ${isLocal ? m.visitorScore : m.localScore}`, 
+          opponentName 
+        };
       });
+  };
+
+  const getHeadToHead = (localId: string | undefined, visitorId: string | undefined, mainMatches: ClupikGame[]) => {
+    if (!localId || !visitorId) return [];
+    return mainMatches.filter(m => 
+      ((m.localTeam?.id === localId || m.localTeamId === localId) && (m.visitorTeam?.id === visitorId || m.visitorTeamId === visitorId)) ||
+      ((m.localTeam?.id === visitorId || m.localTeamId === visitorId) && (m.visitorTeam?.id === localId || m.visitorTeamId === localId))
+    ).slice(0, 5);
   };
 
   const handleTeamClick = (e: React.MouseEvent, targetClubId: string | undefined) => {
@@ -289,7 +312,7 @@ export function Clasificaciones() {
             <div key={gameIdToUse} className="match-wrapper">
               <div 
                 className={`match-card ${selectedGameId === gameIdToUse ? 'expanded' : ''}`}
-                onClick={() => handleGameClick(gameIdToUse)}
+                onClick={() => handleGameClick(m)}
               >
                 <div className="match-date">
                   {new Date(m.date).toLocaleString('es-ES', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -347,8 +370,6 @@ export function Clasificaciones() {
 
                       {comparisonStats && comparisonStats.local && comparisonStats.visitor ? (
                         <div className="comparison-bars">
-                          <h4 className="cb-title">ESTADÍSTICAS DEL GRUPO</h4>
-                          
                           {/* Ganados */}
                           <div className="stat-row">
                             <span className="stat-num">{comparisonStats.local.gamesWon}</span>
@@ -360,6 +381,19 @@ export function Clasificaciones() {
                               <div className="bar-fill" style={{ width: `${(comparisonStats.visitor.gamesWon / Math.max(comparisonStats.visitor.gamesPlayed, 1)) * 100}%` }}></div>
                             </div>
                             <span className="stat-num">{comparisonStats.visitor.gamesWon}</span>
+                          </div>
+
+                          {/* Empatados */}
+                          <div className="stat-row">
+                            <span className="stat-num">{comparisonStats.local.gamesDrawn || 0}</span>
+                            <div className="bar-wrapper left-bar draw-bar">
+                              <div className="bar-fill" style={{ width: `${((comparisonStats.local.gamesDrawn || 0) / Math.max(comparisonStats.local.gamesPlayed, 1)) * 100}%` }}></div>
+                            </div>
+                            <span className="stat-type">EMPATADOS</span>
+                            <div className="bar-wrapper right-bar draw-bar">
+                              <div className="bar-fill" style={{ width: `${((comparisonStats.visitor.gamesDrawn || 0) / Math.max(comparisonStats.visitor.gamesPlayed, 1)) * 100}%` }}></div>
+                            </div>
+                            <span className="stat-num">{comparisonStats.visitor.gamesDrawn || 0}</span>
                           </div>
 
                           {/* Perdidos */}
@@ -377,7 +411,7 @@ export function Clasificaciones() {
 
                            {/* Puntos A Favor */}
                            <div className="stat-row">
-                            <span className="stat-num">{comparisonStats.local.pointsScored}</span>
+                            <span className="stat-num">{Number(comparisonStats.local.pointsScored).toFixed(1)}</span>
                             <div className="bar-wrapper left-bar">
                               <div className="bar-fill pb-fill" style={{ width: `${Math.min((comparisonStats.local.pointsScored / 1000) * 100, 100)}%` }}></div>
                             </div>
@@ -385,36 +419,70 @@ export function Clasificaciones() {
                             <div className="bar-wrapper right-bar">
                               <div className="bar-fill pb-fill" style={{ width: `${Math.min((comparisonStats.visitor.pointsScored / 1000) * 100, 100)}%` }}></div>
                             </div>
-                            <span className="stat-num">{comparisonStats.visitor.pointsScored}</span>
+                            <span className="stat-num">{Number(comparisonStats.visitor.pointsScored).toFixed(1)}</span>
+                          </div>
+                          
+                          {/* Puntos En Contra */}
+                           <div className="stat-row">
+                            <span className="stat-num">{Number(comparisonStats.local.pointsReceived).toFixed(1)}</span>
+                            <div className="bar-wrapper left-bar lose-bar">
+                              <div className="bar-fill" style={{ width: `${Math.min((comparisonStats.local.pointsReceived / 1000) * 100, 100)}%` }}></div>
+                            </div>
+                            <span className="stat-type">EN CONTRA</span>
+                            <div className="bar-wrapper right-bar lose-bar">
+                              <div className="bar-fill" style={{ width: `${Math.min((comparisonStats.visitor.pointsReceived / 1000) * 100, 100)}%` }}></div>
+                            </div>
+                            <span className="stat-num">{Number(comparisonStats.visitor.pointsReceived).toFixed(1)}</span>
                           </div>
                         </div>
                       ) : (
-                        <span className="loading-msg">La API no brindó comparativas de la competición.</span>
+                        <span className="loading-msg">El torneo no emitió datos tabulares vinculantes para este partido.</span>
                       )}
 
-                      {/* Form (Últimos partidos) */}
-                      <div className="form-history">
-                        <div className="local-form">
-                          <span>Últimos</span>
-                          <div className="bubbles">
-                            {getTeamForm(gameDetail.localTeam?.id || gameDetail.localTeamId, matches).map((f, i) => (
-                              <div key={i} className={`form-bubble ${f.win ? 'win' : 'lose'}`} title={`${f.match.localScore} - ${f.match.visitorScore}`}>{f.win ? 'V' : 'D'}</div>
+                      {/* Últimos partidos y Enfrentamientos (Replica exacta de vista del usuario) */}
+                      <div className="form-history-detailed">
+                        <h4 className="cb-title" style={{ textAlign: 'center', margin: '2rem 0 1rem' }}>ÚLTIMOS PARTIDOS</h4>
+                        <div className="form-cols">
+                          <div className="form-col-side left">
+                            {getTeamFormMatches(gameDetail.localTeam?.id || gameDetail.localTeamId, matches).map((f, i) => (
+                              <div key={i} className={`form-hist-row ${f.win ? 'row-win' : 'row-lose'}`}>
+                                <span className="fh-score">{f.scoreText}</span>
+                                <span className="fh-name" title={f.opponentName}>{f.opponentName}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="form-col-side right">
+                             {getTeamFormMatches(gameDetail.visitorTeam?.id || gameDetail.visitorTeamId, matches).map((f, i) => (
+                              <div key={i} className={`form-hist-row ${f.win ? 'row-win' : 'row-lose'}`}>
+                                <span className="fh-score">{f.scoreText}</span>
+                                <span className="fh-name" title={f.opponentName}>{f.opponentName}</span>
+                              </div>
                             ))}
                           </div>
                         </div>
-                        <div className="visitor-form">
-                          <div className="bubbles">
-                            {getTeamForm(gameDetail.visitorTeam?.id || gameDetail.visitorTeamId, matches).map((f, i) => (
-                              <div key={i} className={`form-bubble ${f.win ? 'win' : 'lose'}`} title={`${f.match.localScore} - ${f.match.visitorScore}`}>{f.win ? 'V' : 'D'}</div>
-                            ))}
-                          </div>
-                          <span>Partidos</span>
+                      </div>
+
+                      {/* Enfrentamientos Directos */}
+                      <div className="h2h-detailed">
+                        <h4 className="cb-title" style={{ textAlign: 'center', margin: '2rem 0 1rem' }}>ENFRENTAMIENTOS DIRECTOS</h4>
+                        <div className="h2h-list">
+                          {getHeadToHead(gameDetail.localTeam?.id || gameDetail.localTeamId, gameDetail.visitorTeam?.id || gameDetail.visitorTeamId, matches).map((hm, i) => (
+                             <div key={i} className="h2h-row">
+                               <span className="h2h-date">{new Date(hm.date).toLocaleString('es-ES', { month: 'short', day: 'numeric'})}</span>
+                               <span className="h2h-lname">{hm.localTeamEditableName || hm.localTeamName}</span>
+                               <span className="h2h-score">{hm.localScore} - {hm.visitorScore}</span>
+                               <span className="h2h-vname">{hm.visitorTeamEditableName || hm.visitorTeamName}</span>
+                             </div>
+                          ))}
+                          {getHeadToHead(gameDetail.localTeam?.id || gameDetail.localTeamId, gameDetail.visitorTeam?.id || gameDetail.visitorTeamId, matches).length === 0 && (
+                            <span className="loading-msg">No hay enfrentamientos anteriores registrados en el feed.</span>
+                          )}
                         </div>
                       </div>
 
                     </div>
                   ) : (
-                    <span className="loading-msg">Métricas en blanco...</span>
+                    <span className="loading-msg">Métricas en blanco... El objeto local está corrupto o la federación borró su rastro.</span>
                   )}
                 </div>
               )}

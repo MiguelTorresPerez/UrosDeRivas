@@ -81,12 +81,14 @@
 
 .ss-dropdown {
   position: absolute;
-  top: 110%;
+  top: 100%; /* Changed from 110% to eliminate gap causing mouseLeave */
   left: 0;
   right: 0;
   background-color: #161616;
   border: 1px solid #333;
-  border-radius: 6px;
+  border-top: none;
+  border-bottom-left-radius: 6px;
+  border-bottom-right-radius: 6px;
   z-index: 100;
   box-shadow: 0 10px 25px rgba(0,0,0,0.5);
   overflow: hidden;
@@ -407,48 +409,101 @@
   background: #ff4444; 
 }
 
-.pb-fill {
-  background: var(--accent-turquoise) !important;
+.form-history-detailed {
+  margin-top: 1rem;
 }
 
-.form-history {
+.form-cols {
   display: flex;
-  justify-content: space-around;
-  padding-top: 1rem;
+  justify-content: space-between;
+  gap: 2rem;
 }
 
-.local-form, .visitor-form {
+.form-col-side {
+  flex: 1;
   display: flex;
-  align-items: center;
-  gap: 1rem;
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-
-.bubbles {
-  display: flex;
+  flex-direction: column;
   gap: 0.5rem;
 }
 
-.form-bubble {
-  width: 25px;
-  height: 25px;
-  border-radius: 50%;
+.form-hist-row {
   display: flex;
   align-items: center;
+  background-color: #111;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.form-hist-row.row-win .fh-score {
+  background-color: rgba(64, 224, 208, 0.15);
+  color: var(--accent-turquoise);
+}
+
+.form-hist-row.row-lose .fh-score {
+  background-color: rgba(255, 68, 68, 0.15);
+  color: #ff4444;
+}
+
+.fh-score {
+  font-weight: 800;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  margin-right: 1rem;
+  white-space: nowrap;
+}
+
+.fh-name {
+  color: #ccc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Head to Head Table */
+.h2h-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.h2h-row {
+  display: flex;
   justify-content: center;
-  font-size: 0.7rem;
+  align-items: center;
+  background-color: #1a1a1a;
+  padding: 0.8rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.h2h-date {
+  color: var(--text-secondary);
+  width: 60px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.h2h-lname {
+  flex: 1;
+  text-align: right;
+}
+
+.h2h-vname {
+  flex: 1;
+  text-align: left;
+}
+
+.h2h-score {
+  font-size: 1.1rem;
   font-weight: 900;
+  padding: 0 1.5rem;
   color: #fff;
 }
 
-.form-bubble.win {
-  background-color: var(--accent-turquoise);
-  color: #000;
-}
-
-.form-bubble.lose {
-  background-color: #ff4444;
+.draw-bar .bar-fill {
+  background: #aaa;
 }
 
 /* Standings Selector */
