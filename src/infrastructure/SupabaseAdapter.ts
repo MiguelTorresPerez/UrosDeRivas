@@ -109,6 +109,7 @@ export class SupabaseAdapter implements AuthPort, MarketPort, EventPort, SystemL
   }
 
   async createEvent(event: Omit<Event, 'id'>): Promise<Event> {
+    const user = await this.getUser();
     const { data, error } = await supabase.from('events').insert({
       title: event.title,
       date: event.date,
@@ -116,6 +117,7 @@ export class SupabaseAdapter implements AuthPort, MarketPort, EventPort, SystemL
       image_url: event.imageUrl,
       description: event.description,
       type: event.type,
+      created_by: user?.id,
     }).select().single();
     if (error) throw error;
     return { id: data.id, title: data.title, date: data.date, location: data.location, imageUrl: data.image_url, description: data.description, type: data.type };
