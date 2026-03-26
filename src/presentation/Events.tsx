@@ -8,7 +8,6 @@ import './Events.css';
 
 const adapter = new SupabaseAdapter();
 const CLUB_ID = '67';
-const CLUPIK_IMG = 'https://api.clupik.com/storage';
 
 // A unified event item that can come from either Supabase or Clupik
 interface UnifiedEvent {
@@ -110,8 +109,9 @@ export function Events() {
         if (!res.ok) throw new Error('Clupik publications failed');
         const data = await res.json();
         const pubs: UnifiedEvent[] = (Array.isArray(data) ? data : []).map((p: any) => {
-          const firstImageId = p.card?.images?.[0] || p.images?.[0]?.id;
-          const imageUrl = firstImageId ? `${CLUPIK_IMG}/${firstImageId}` : undefined;
+          const rawText = p.card?.text || '';
+          const match = rawText.match(/<img[^>]+src=["']?([^"'>]+)["']/i);
+          const imageUrl = match ? match[1] : undefined;
           return {
             id: `clupik_${p.id}`,
             title: p.card?.title || p.slug || 'Publicación',
@@ -279,9 +279,9 @@ export function Events() {
                                 {detail.links.map((link: string, i: number) => (
                                   <a key={i} href={link} target="_blank" rel="noopener noreferrer" className="detail-link">
                                     {link.includes('forms.gle') || link.includes('forms.google') ? '📝 Formulario de Inscripción' :
-                                     link.includes('instagram') ? '📸 Instagram' :
-                                     link.includes('twitter') || link.includes('x.com') ? '🐦 Twitter/X' :
-                                     `🌐 ${new URL(link).hostname}`}
+                                      link.includes('instagram') ? '📸 Instagram' :
+                                        link.includes('twitter') || link.includes('x.com') ? '🐦 Twitter/X' :
+                                          `🌐 ${new URL(link).hostname}`}
                                   </a>
                                 ))}
                               </div>
@@ -301,14 +301,14 @@ export function Events() {
                               ))}
                             </div>
                           )}
-                          
+
                           <div className="event-registration-box" style={{ marginTop: '1.5rem', textAlign: 'center', padding: '1.25rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
                             {user ? (
-                              <button 
+                              <button
                                 className={`btn-primary ${userRegistrations.includes(ev.id) ? 'registered' : ''}`}
                                 onClick={(e) => handleToggleRegistration(ev.id, e)}
-                                style={{ 
-                                  background: userRegistrations.includes(ev.id) ? 'rgba(56, 142, 60, 0.2)' : '', 
+                                style={{
+                                  background: userRegistrations.includes(ev.id) ? 'rgba(56, 142, 60, 0.2)' : '',
                                   borderColor: userRegistrations.includes(ev.id) ? '#388e3c' : '',
                                   color: userRegistrations.includes(ev.id) ? '#4caf50' : ''
                                 }}
