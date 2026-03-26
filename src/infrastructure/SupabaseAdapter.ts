@@ -1,24 +1,23 @@
 import { supabase } from '../utils/supabase';
-import { AuthPort, MarketPort, EventPort } from '../application/ports';
-import { User, MarketItem, Event } from '../domain/entities';
+import { AuthPort, MarketPort, EventPort, SystemLogPort, OrderPort } from '../application/ports';
+import { User, MarketItem, Event, SystemLog, Order } from '../domain/entities';
 
-export class SupabaseAdapter implements AuthPort, MarketPort, EventPort {
+export class SupabaseAdapter implements AuthPort, MarketPort, EventPort, SystemLogPort, OrderPort {
   async getUser(): Promise<User | null> {
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error || !user) return null;
     
-    // Check if user is admin via a custom claim or a profiles table
-    // Simplification: We will assume a 'profiles' table holds isAdmin flag
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', user.id)
+    // Check if user is admin or coach via user_roles table
+    const { data: roleRow } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
       .single();
 
     return {
       id: user.id,
       email: user.email!,
-      isAdmin: profile?.is_admin || false,
+      role: roleRow?.role || 'user',
     };
   }
 
@@ -29,6 +28,19 @@ export class SupabaseAdapter implements AuthPort, MarketPort, EventPort {
     const userResult = await this.getUser();
     if (!userResult) throw new Error("Failed to get profile");
     return userResult;
+  }
+
+  async signInWithGoogle(): Promise<void> {
+    // Determine the precise origin path considering GitHub Pages base url padding seamlessly
+    const redirectUrl = `${window.location.origin}${import.meta.env.BASE_URL}`;
+    
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectUrl
+      }
+    });
+    if (error) throw error;
   }
 
   async signOut(): Promise<void> {
@@ -45,6 +57,8 @@ export class SupabaseAdapter implements AuthPort, MarketPort, EventPort {
       price: item.price,
       imageUrl: item.image_url,
       description: item.description,
+      sizes: item.sizes,
+      stripe_price_id: item.stripe_price_id,
     }));
   }
 
@@ -54,9 +68,11 @@ export class SupabaseAdapter implements AuthPort, MarketPort, EventPort {
       price: item.price,
       image_url: item.imageUrl,
       description: item.description,
+      sizes: item.sizes || [],
+      stripe_price_id: item.stripe_price_id,
     }).select().single();
     if (error) throw error;
-    return { id: data.id, name: data.name, price: data.price, imageUrl: data.image_url, description: data.description };
+    return { id: data.id, name: data.name, price: data.price, imageUrl: data.image_url, description: data.description, sizes: data.sizes, stripe_price_id: data.stripe_price_id };
   }
 
   async updateItem(id: string, item: Partial<MarketItem>): Promise<MarketItem> {
@@ -64,11 +80,13 @@ export class SupabaseAdapter implements AuthPort, MarketPort, EventPort {
     if (item.name) payload.name = item.name;
     if (item.price) payload.price = item.price;
     if (item.imageUrl) payload.image_url = item.imageUrl;
-    if (item.description) payload.description = item.description;
+    if (item.description !== undefined) payload.description = item.description;
+    if (item.sizes !== undefined) payload.sizes = item.sizes;
+    if (item.stripe_price_id !== undefined) payload.stripe_price_id = item.stripe_price_id;
 
     const { data, error } = await supabase.from('market_items').update(payload).eq('id', id).select().single();
     if (error) throw error;
-    return { id: data.id, name: data.name, price: data.price, imageUrl: data.image_url, description: data.description };
+    return { id: data.id, name: data.name, price: data.price, imageUrl: data.image_url, description: data.description, sizes: data.sizes, stripe_price_id: data.stripe_price_id };
   }
 
   async deleteItem(id: string): Promise<void> {
@@ -121,5 +139,35 @@ export class SupabaseAdapter implements AuthPort, MarketPort, EventPort {
   async deleteEvent(id: string): Promise<void> {
     const { error } = await supabase.from('events').delete().eq('id', id);
     if (error) throw error;
+  }
+
+  async getLogs(): Promise<SystemLog[]> {
+    const { data, error } = await supabase.from('system_logs').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  }
+
+  async deleteLog(id: string): Promise<void> {
+    const { error } = await supabase.from('system_logs').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  async createLog(actionType: string, metadata?: any): Promise<void> {
+    const { error } = await supabase.from('system_logs').insert({ action_type: actionType, metadata });
+    // Silently fail for telemetry if needed, but here we throw so dev can see
+    if (error) console.error("Telemetry error", error);
+  }
+
+  async getOrders(): Promise<Order[]> {
+    const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    // Map db names to entities securely if needed, but db names match exactly here thanks to TypeScript
+    return data;
+  }
+
+  async updateOrderStatus(id: string, status: string): Promise<Order> {
+    const { data, error } = await supabase.from('orders').update({ status }).eq('id', id).select().single();
+    if (error) throw error;
+    return data;
   }
 }

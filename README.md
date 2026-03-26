@@ -11,6 +11,8 @@ Este repositorio no solo contiene el ecosistema del club de baloncesto Uros de R
 - **Filtros Dinámicos Globales:** Un buscador tipo *Combobox* autocompletable que permite diseccionar toda la información deportiva por competiciones globales y navegar en "cascada" por el árbol de competiciones y redes de clubes inscritos sin sacrificar la interfaz principal de tu club base.
 - **Base de Datos Back-end Opcional:** Configuración lista para usarse con **Supabase** para administrar bases de datos transaccionales satélites, sistema de login y roles de Administrador. (Ideal para implementar la Tienda de *Merchandising* o las reservas de *Eventos* no nativos de Clupik).
 - **Despliegue Cero-Fricciones con GitHub Pages:** Preparado para compilarse y publicarse de manera gratuita y eficiente desde el ecosistema `gh-pages` con *Client-Side Routing* estabilizado dinámicamente.
+- **Stripe Edge E-Commerce**: Seamlessly integrated Serverless checkout sessions via Supabase Edge Functions linking physical team merchandising straight to an unhackable Order tracker.
+- **Deep Dashboard**: Comprehensive Admin Panel allowing club management to trace page routing telemetry seamlessly, intercept physical Stripe orders, and edit Market Catalogs.
 
 ---
 

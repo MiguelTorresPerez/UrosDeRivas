@@ -13,10 +13,12 @@ interface AppState {
   // Actions
   initAuth: () => Promise<void>;
   signIn: (email: string, pass: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   
   fetchItems: () => Promise<void>;
   fetchEvents: () => Promise<void>;
+  logActivity: (actionType: string, metadata?: any) => Promise<void>;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -38,6 +40,11 @@ export const useStore = create<AppState>((set) => ({
   signIn: async (email, pass) => {
     const user = await adapter.signIn(email, pass);
     set({ user });
+  },
+
+  signInWithGoogle: async () => {
+    // Calling the adapter redirects the window dynamically
+    await adapter.signInWithGoogle();
   },
 
   signOut: async () => {
@@ -64,6 +71,14 @@ export const useStore = create<AppState>((set) => ({
     } catch(e) {
       console.error(e);
       set({ loading: false });
+    }
+  },
+
+  logActivity: async (actionType, metadata) => {
+    try {
+      await adapter.createLog(actionType, metadata);
+    } catch (e) {
+      // Intentionally swallow errors for telemetry to avoid crashing UI
     }
   }
 }));

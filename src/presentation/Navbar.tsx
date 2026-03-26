@@ -21,10 +21,17 @@ export function Navbar() {
           <Link to="/events" onClick={() => setIsOpen(false)}>EVENTOS</Link>
           <Link to="/market" onClick={() => setIsOpen(false)}>TIENDA</Link>
           <Link to="/clasificaciones" onClick={() => setIsOpen(false)}>CLASIFICACIONES</Link>
+          {user && (user.role === 'admin' || user.role === 'coach') && (
+            <Link to="/admin" onClick={() => setIsOpen(false)}>ESTADÍSTICAS</Link>
+          )}
           
           {user ? (
             <div className="auth-box">
-              <span className="user-badge">{user.isAdmin ? 'Admin' : 'Socio'}</span>
+              {user.role !== 'user' && (
+                <span className={`user-badge role-${user.role}`}>
+                  {user.role === 'admin' ? 'Admin' : 'Entrenador'}
+                </span>
+              )}
               <button onClick={() => { signOut(); setIsOpen(false); }} className="btn-logout">Salir</button>
             </div>
           ) : (

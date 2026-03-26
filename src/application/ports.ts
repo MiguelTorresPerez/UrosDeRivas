@@ -19,3 +19,18 @@ export interface EventPort {
   updateEvent(id: string, event: Partial<Event>): Promise<Event>;
   deleteEvent(id: string): Promise<void>;
 }
+
+export interface SystemLogPort {
+  getLogs(): Promise<any[]>;
+  deleteLog(id: string): Promise<void>;
+  createLog(actionType: string, metadata?: any): Promise<void>;
+}
+
+export interface PaymentPort {
+  createCheckoutSession(itemId: string, userEmail: string): Promise<string>;
+}
+
+export interface OrderPort {
+  getOrders(): Promise<any[]>;
+  updateOrderStatus(id: string, status: string): Promise<any>;
+}
