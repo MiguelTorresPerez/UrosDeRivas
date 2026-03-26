@@ -8,7 +8,7 @@ import './Events.css';
 
 const adapter = new SupabaseAdapter();
 const CLUB_ID = '67';
-const CLUPIK_IMG = 'https://storage.clupik.com/gallery';
+const CLUPIK_IMG = 'https://api.clupik.com/storage';
 
 // A unified event item that can come from either Supabase or Clupik
 interface UnifiedEvent {
@@ -66,16 +66,38 @@ function sanitizeHtml(html: string): string {
 }
 
 export function Events() {
-  const { events, loading, fetchEvents } = useStore();
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editEvent, setEditEvent] = useState<Event | null>(null);
+  const { user } = useStore();
+  const [supabaseEvents, setSupabaseEvents] = useState<UnifiedEvent[]>([]);
   const [clupikPubs, setClupikPubs] = useState<UnifiedEvent[]>([]);
+  const [loading, setLoading] = useState(true);
   const [loadingClupik, setLoadingClupik] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [detailCache, setDetailCache] = useState<Record<string, any>>({});
   const [detailLoading, setDetailLoading] = useState(false);
-  const [detailCache, setDetailCache] = useState<Record<string, { body: string; links: string[] }>>({});
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editEvent, setEditEvent] = useState<Event | null>(null);
+  const [userRegistrations, setUserRegistrations] = useState<string[]>([]);
 
-  useEffect(() => { fetchEvents(); }, [fetchEvents]);
+  const loadSupabaseEvents = async () => {
+    setLoading(true);
+    try {
+      const fetchedEvents = await adapter.getEvents();
+      setSupabaseEvents(fetchedEvents.map(e => ({ ...e, source: 'supabase' as const })));
+      if (user) {
+        const registrations = await adapter.getUserRegistrations(user.id);
+        setUserRegistrations(registrations);
+      }
+    } catch (e) {
+      console.error('Failed to fetch Supabase events or registrations:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch Supabase events and user registrations
+  useEffect(() => {
+    loadSupabaseEvents();
+  }, [user]); // Re-fetch if user changes
 
   // Fetch Clupik publications
   useEffect(() => {
@@ -88,10 +110,8 @@ export function Events() {
         if (!res.ok) throw new Error('Clupik publications failed');
         const data = await res.json();
         const pubs: UnifiedEvent[] = (Array.isArray(data) ? data : []).map((p: any) => {
-          const imgObj = p.images?.[0];
-          const imageUrl = imgObj?.galleryId && imgObj?.id
-            ? `${CLUPIK_IMG}/${imgObj.galleryId}/public/${imgObj.id}`
-            : undefined;
+          const firstImageId = p.card?.images?.[0] || p.images?.[0]?.id;
+          const imageUrl = firstImageId ? `${CLUPIK_IMG}/${firstImageId}` : undefined;
           return {
             id: `clupik_${p.id}`,
             title: p.card?.title || p.slug || 'Publicación',
@@ -148,10 +168,6 @@ export function Events() {
   };
 
   // Merge and sort all events
-  const supabaseEvents: UnifiedEvent[] = events.map(e => ({
-    ...e,
-    source: 'supabase' as const,
-  }));
   const allEvents: UnifiedEvent[] = [...supabaseEvents, ...clupikPubs]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -162,14 +178,24 @@ export function Events() {
     } else {
       await adapter.createEvent(eventData);
     }
-    fetchEvents();
+    loadSupabaseEvents();
   };
   const handleOpenCreate = () => { setEditEvent(null); setModalOpen(true); };
   const handleOpenEdit = (ev: Event) => { setEditEvent(ev); setModalOpen(true); };
   const handleDelete = async (id: string) => {
     if (!window.confirm('¿Seguro que quieres borrar este evento?')) return;
-    try { await adapter.deleteEvent(id); fetchEvents(); }
+    try { await adapter.deleteEvent(id); loadSupabaseEvents(); }
     catch (e: any) { alert('Error: ' + e.message); }
+  };
+
+  const handleToggleRegistration = async (eventId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) return alert('Debes iniciar sesión para apuntarte.');
+    const isRegistered = userRegistrations.includes(eventId);
+    try {
+      await adapter.toggleEventRegistration(eventId, user.id, isRegistered);
+      setUserRegistrations(prev => isRegistered ? prev.filter(id => id !== eventId) : [...prev, eventId]);
+    } catch (e: any) { alert('Error interno: ' + e.message); }
   };
 
   const isLoading = loading && loadingClupik && allEvents.length === 0;
@@ -250,7 +276,7 @@ export function Events() {
                             {detail.links.length > 0 && (
                               <div className="detail-links">
                                 <h4>🔗 Enlaces relacionados</h4>
-                                {detail.links.map((link, i) => (
+                                {detail.links.map((link: string, i: number) => (
                                   <a key={i} href={link} target="_blank" rel="noopener noreferrer" className="detail-link">
                                     {link.includes('forms.gle') || link.includes('forms.google') ? '📝 Formulario de Inscripción' :
                                      link.includes('instagram') ? '📸 Instagram' :
@@ -275,6 +301,24 @@ export function Events() {
                               ))}
                             </div>
                           )}
+                          
+                          <div className="event-registration-box" style={{ marginTop: '1.5rem', textAlign: 'center', padding: '1.25rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                            {user ? (
+                              <button 
+                                className={`btn-primary ${userRegistrations.includes(ev.id) ? 'registered' : ''}`}
+                                onClick={(e) => handleToggleRegistration(ev.id, e)}
+                                style={{ 
+                                  background: userRegistrations.includes(ev.id) ? 'rgba(56, 142, 60, 0.2)' : '', 
+                                  borderColor: userRegistrations.includes(ev.id) ? '#388e3c' : '',
+                                  color: userRegistrations.includes(ev.id) ? '#4caf50' : ''
+                                }}
+                              >
+                                {userRegistrations.includes(ev.id) ? '✅ Inscrito (Darse de baja)' : '🚀 Apuntarme'}
+                              </button>
+                            ) : (
+                              <p className="login-hint" style={{ color: '#aaa', fontSize: '0.9rem', margin: 0 }}>🔒 Inicia sesión en la plataforma para poder apuntarte.</p>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>

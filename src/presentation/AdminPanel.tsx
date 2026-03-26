@@ -1,21 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Fragment } from 'react';
 import { SupabaseAdapter } from '../infrastructure/SupabaseAdapter';
 import { SystemLog, Order, MarketItem } from '../domain/entities';
 import { AdminGuard } from './AdminGuard';
 import { useStore } from './store';
 import { MarketItemModal } from './MarketItemModal';
-import { Trash2, RefreshCw, ShoppingCart, Activity, Tag, Pencil, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { Trash2, RefreshCw, Pencil, CheckCircle, Clock, XCircle } from 'lucide-react';
 import './AdminPanel.css';
 
 const adapter = new SupabaseAdapter();
 
 export function AdminPanel() {
   const { user } = useStore();
-  const [activeTab, setActiveTab] = useState<'stats' | 'orders' | 'market'>('stats');
+  const [activeTab, setActiveTab] = useState<'users' | 'stats' | 'orders' | 'market' | 'events'>('users');
   
   const [logs, setLogs] = useState<SystemLog[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [items, setItems] = useState<MarketItem[]>([]);
+  const [systemUsers, setSystemUsers] = useState<any[]>([]);
+  const [events, setEvents] = useState<import('../domain/entities').Event[]>([]);
+  const [attendees, setAttendees] = useState<Record<string, any[]>>({});
+  const [loadingAttendees, setLoadingAttendees] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   
   // Market Item Modal state
@@ -25,7 +29,10 @@ export function AdminPanel() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      if (activeTab === 'stats') {
+      if (activeTab === 'users' && user?.role === 'admin') {
+        const data = await adapter.getSystemUsers();
+        setSystemUsers(data);
+      } else if (activeTab === 'stats') {
         const data = await adapter.getLogs();
         setLogs(data);
       } else if (activeTab === 'orders' && user?.role === 'admin') {
@@ -35,6 +42,9 @@ export function AdminPanel() {
         const data = await adapter.getItems();
         setItems(data);
         await syncClupikProducts(data);
+      } else if (activeTab === 'events' && (user?.role === 'admin' || user?.role === 'coach')) {
+        const data = await adapter.getEvents();
+        setEvents(data);
       }
     } catch (e) {
       console.error(e);
@@ -116,6 +126,14 @@ export function AdminPanel() {
     } catch (e: any) { alert(e.message); }
   };
 
+  const handleDeleteUser = async (id: string) => {
+    if (!window.confirm('¿Eliminar esta cuenta de usuario para siempre? Esta acción no se puede deshacer.')) return;
+    try {
+      await adapter.deleteUser(id);
+      setSystemUsers(systemUsers.filter(u => u.id !== id));
+    } catch (e: any) { alert(e.message); }
+  };
+
   const renderStats = () => (
     <>
       <div className="admin-stats-summary">
@@ -129,24 +147,25 @@ export function AdminPanel() {
         </div>
       </div>
       <div className="admin-table-container">
+        <h3>Últimas Acciones Registradas (Últimas 50)</h3>
         <table className="admin-table">
           <thead>
             <tr>
               <th>Fecha</th>
+              <th>Usuario/ID</th>
               <th>Acción</th>
-              <th>Usuario</th>
               <th>Detalles</th>
-              <th></th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
             {loading ? <tr><td colSpan={5} className="table-empty">Cargando...</td></tr> : 
              logs.length === 0 ? <tr><td colSpan={5} className="table-empty">Sin actividad.</td></tr> :
-             logs.map(log => (
+             logs.slice(0, 50).map(log => (
               <tr key={log.id}>
                 <td>{new Date(log.created_at).toLocaleString('es-ES')}</td>
-                <td><span className="badge-action">{log.action_type}</span></td>
                 <td className="monospace">{log.user_id?.substring(0,8) || 'Anon'}</td>
+                <td><span className="badge-action">{log.action_type}</span></td>
                 <td><pre className="metadata-box">{log.metadata ? JSON.stringify(log.metadata) : '-'}</pre></td>
                 <td>
                   <button onClick={() => handleDeleteLog(log.id)} className="btn-icon delete"><Trash2 size={16} /></button>
@@ -208,6 +227,92 @@ export function AdminPanel() {
     </div>
   );
 
+  const renderUsers = () => (
+    <div className="admin-table-container">
+      <h3>Usuarios Registrados</h3>
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Rol Asignado</th>
+            <th>Fecha Registro</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {loading ? <tr><td colSpan={4} className="table-empty">Cargando usuarios...</td></tr> :
+           systemUsers.length === 0 ? <tr><td colSpan={4} className="table-empty">Sin usuarios registrados o sin permisos suficientes.</td></tr> :
+           systemUsers.map(sysUser => (
+            <tr key={sysUser.id}>
+              <td>{sysUser.email}</td>
+              <td><span className={`status-badge ${sysUser.role === 'admin' ? 'completed' : sysUser.role === 'coach' ? 'processing' : 'pending'}`}>{sysUser.role?.toUpperCase() || 'USER'}</span></td>
+              <td>{new Date(sysUser.created_at).toLocaleDateString()}</td>
+              <td>
+                <button className="btn-icon delete" title="Eliminar cuenta" onClick={() => handleDeleteUser(sysUser.id)}><XCircle size={16} /></button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  const handleLoadAttendees = async (eventId: string) => {
+    setLoadingAttendees(eventId);
+    try {
+      const data = await adapter.getEventAttendees(eventId);
+      setAttendees({ ...attendees, [eventId]: data });
+    } catch (e: any) { alert(e.message); }
+    setLoadingAttendees(null);
+  };
+
+  const renderEvents = () => (
+    <div className="admin-table-container">
+      <h3>Inscripciones a Eventos Propios</h3>
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>Evento</th>
+            <th>Fecha</th>
+            <th>Tipo</th>
+            <th>Inscritos</th>
+          </tr>
+        </thead>
+        <tbody>
+          {loading ? <tr><td colSpan={4} className="table-empty">Cargando eventos...</td></tr> :
+           events.length === 0 ? <tr><td colSpan={4} className="table-empty">No hay eventos propios guardados en el sistema.</td></tr> :
+           events.map(ev => (
+            <Fragment key={ev.id}>
+             <tr>
+               <td>{ev.title}</td>
+               <td>{new Date(ev.date).toLocaleDateString()}</td>
+               <td><span className="status-badge processing">{ev.type.toUpperCase()}</span></td>
+               <td>
+                 <button className="btn-secondary" onClick={() => handleLoadAttendees(ev.id)} disabled={loadingAttendees === ev.id}>
+                   {loadingAttendees === ev.id ? 'Cargando...' : 'Ver Asistentes'}
+                 </button>
+               </td>
+             </tr>
+             {attendees[ev.id] && (
+               <tr className="attendees-row">
+                 <td colSpan={4}>
+                   <div className="attendees-list">
+                     <strong>Usuarios Inscritos ({attendees[ev.id].length}): </strong>
+                     {attendees[ev.id].length === 0 ? 'Nadie inscrito todavía.' :
+                      attendees[ev.id].map(att => (
+                        <span key={att.user_id} className="attendee-pill">{att.user_email}</span>
+                      ))}
+                   </div>
+                 </td>
+               </tr>
+             )}
+            </Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
   const renderMarket = () => (
     <div className="admin-table-container">
       <div className="table-toolbar">
@@ -256,26 +361,39 @@ export function AdminPanel() {
         </div>
 
         <div className="admin-tabs">
-          <button className={`tab-btn ${activeTab === 'stats' ? 'active' : ''}`} onClick={() => setActiveTab('stats')}>
-            <Activity size={18} /> Estadísticas
+        {user?.role === 'admin' && (
+          <button className={`tab-btn ${activeTab === 'users' ? 'active' : ''}`} onClick={() => setActiveTab('users')}>
+            Usuarios
           </button>
-          {user?.role === 'admin' && (
-            <>
-              <button className={`tab-btn ${activeTab === 'market' ? 'active' : ''}`} onClick={() => setActiveTab('market')}>
-                <Tag size={18} /> Catálogo Tienda
-              </button>
-              <button className={`tab-btn ${activeTab === 'orders' ? 'active' : ''}`} onClick={() => setActiveTab('orders')}>
-                <ShoppingCart size={18} /> Pedidos Stripe
-              </button>
-            </>
-          )}
-        </div>
+        )}
+        <button className={`tab-btn ${activeTab === 'stats' ? 'active' : ''}`} onClick={() => setActiveTab('stats')}>
+          Estadísticas
+        </button>
+        {user?.role === 'admin' && (
+          <button className={`tab-btn ${activeTab === 'orders' ? 'active' : ''}`} onClick={() => setActiveTab('orders')}>
+            Pedidos
+          </button>
+        )}
+        {user?.role === 'admin' && (
+          <button className={`tab-btn ${activeTab === 'market' ? 'active' : ''}`} onClick={() => setActiveTab('market')}>
+            Catálogo Tienda
+          </button>
+        )}
+        <button className={`tab-btn ${activeTab === 'events' ? 'active' : ''}`} onClick={() => setActiveTab('events')}>
+          Eventos & Inscripciones
+        </button>
+      </div>
 
+      <div className="admin-content-area">
+        {loading && <div className="loading-state">Cargando...</div>}
         <div className="admin-tab-content">
+          {activeTab === 'users' && renderUsers()}
           {activeTab === 'stats' && renderStats()}
           {activeTab === 'orders' && renderOrders()}
           {activeTab === 'market' && renderMarket()}
+          {activeTab === 'events' && renderEvents()}
         </div>
+      </div>
       </div>
 
       <MarketItemModal

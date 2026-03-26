@@ -2,22 +2,29 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import Stripe from "https://esm.sh/stripe@12.18.0?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.33.1";
 
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") as string, {
-  apiVersion: "2022-11-15",
-  httpClient: Stripe.createFetchHttpClient(),
-});
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
+let stripe: Stripe;
+
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (!stripeKey) throw new Error("La clave secreta de Stripe no está configurada en la Edge Function.");
+    
+    if (!stripe) {
+      stripe = new Stripe(stripeKey, {
+        apiVersion: "2022-11-15",
+        httpClient: Stripe.createFetchHttpClient(),
+      });
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''

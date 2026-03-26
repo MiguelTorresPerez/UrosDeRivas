@@ -141,6 +141,50 @@ export class SupabaseAdapter implements AuthPort, MarketPort, EventPort, SystemL
     if (error) throw error;
   }
 
+  // ============================================
+  // EVENT REGISTRATIONS
+  // ============================================
+  async toggleEventRegistration(eventId: string, userId: string, isRegistered: boolean): Promise<void> {
+    if (isRegistered) {
+      const { error } = await supabase.from('event_registrations').delete().match({ event_id: eventId, user_id: userId });
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from('event_registrations').insert({ event_id: eventId, user_id: userId });
+      if (error) throw error;
+    }
+  }
+
+  async getUserRegistrations(userId: string): Promise<string[]> {
+    const { data, error } = await supabase.from('event_registrations').select('event_id').eq('user_id', userId);
+    if (error) return [];
+    return data.map(r => r.event_id);
+  }
+
+  async getEventAttendees(eventId: string): Promise<any[]> {
+    const { data, error } = await supabase.rpc('get_event_registrations', { target_event_id: eventId });
+    if (error) { console.error('Error fetching attendees', error); return []; }
+    return data || [];
+  }
+
+  async verifyPayment(sessionId: string): Promise<boolean> {
+    const { data } = await supabase.from('orders').select('status').eq('stripe_session_id', sessionId).single();
+    return data?.status === 'completed';
+  }
+
+  // ============================================
+  // USER MANAGEMENT (RPCs)
+  // ============================================
+  async getSystemUsers(): Promise<any[]> {
+    const { data, error } = await supabase.rpc('get_system_users');
+    if (error) { console.error('Error fetching users:', error); return []; }
+    return data || [];
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    const { error } = await supabase.rpc('delete_user_account', { target_user_id: id });
+    if (error) throw error;
+  }
+
   async getLogs(): Promise<SystemLog[]> {
     const { data, error } = await supabase.from('system_logs').select('*').order('created_at', { ascending: false });
     if (error) throw error;
